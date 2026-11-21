@@ -81,17 +81,17 @@ def main():
                   'stage':'A2','reason':'SHA-256 mismatch' if observed != expected else 'hash matched'})
     cases.extend([
         audit('06_invalid_syntax', '  this_is_not_valid_lean'),
-        audit('07_add_zero', '  intro n\\n  exact Nat.add_zero n',
+        audit('07_add_zero', '  intro n\n  exact Nat.add_zero n',
               goal='∀ n : Nat, n + 0 = n'),
-        audit('08_zero_add', '  intro n\\n  exact Nat.zero_add n',
+        audit('08_zero_add', '  intro n\n  exact Nat.zero_add n',
               goal='∀ n : Nat, 0 + n = n'),
-        audit('09_add_comm', '  intro a b\\n  exact Nat.add_comm a b',
+        audit('09_add_comm', '  intro a b\n  exact Nat.add_comm a b',
               goal='∀ a b : Nat, a + b = b + a'),
-        audit('10_induction', '  intro n\\n  induction n with\\n  | zero => rfl\\n  | succ k ih => rfl',
-              goal='∀ n : Nat, n + 0 = n'),
+        audit('10_induction', '  intro n\n  induction n with\n  | zero => rfl\n  | succ k ih => simpa only [Nat.add_succ] using congrArg Nat.succ ih',
+              goal='∀ n : Nat, 0 + n = n'),
         audit('11_false_goal', '  trivial', goal='False'),
         audit('12_axiom_transitive', '  exact helper', goal='True',
-              trusted_prelude='axiom injected : True\\ntheorem helper : True := injected'),
+              trusted_prelude='axiom injected : True\ntheorem helper : True := injected'),
     ])
     expected_decisions = {
       '01_valid':'ACCEPT','02_sorry':'REJECT','03_custom_axiom':'REJECT',
