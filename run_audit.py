@@ -66,39 +66,52 @@ def audit(case, proof, goal='True', requested_goal=None, trusted_prelude=''):
 
 
 def main():
+    # A controlled, reproducible extension: 12 cases, including arithmetic,
+    # quantifiers, induction, axiom propagation and a deliberately false goal.
     cases = [
         audit('01_valid', '  trivial'),
         audit('02_sorry', '  sorry'),
-        # The evaluator's test fixture declares an axiom to simulate a compromised proof.
         audit('03_custom_axiom', '  exact injected', trusted_prelude='axiom injected : True'),
         audit('04_statement_substitution', '  trivial', requested_goal='False'),
     ]
     expected = digest(b'trusted file v1')
     observed = digest(b'trusted file v2')
-    cases.append({'case': '05_artifact_modified', 'decision': 'REJECT' if observed != expected else 'ACCEPT',
-                  'stage': 'A2', 'reason': 'SHA-256 mismatch' if observed != expected else 'hash matched'})
-    cases.append(audit('06_invalid_syntax', '  this_is_not_valid_lean'))
-    expected_decisions = {'01_valid': 'ACCEPT', '02_sorry': 'REJECT', '03_custom_axiom': 'REJECT',
-                          '04_statement_substitution': 'REJECT', '05_artifact_modified': 'REJECT',
-                          '06_invalid_syntax': 'REJECT'}
+    cases.append({'case':'05_artifact_modified',
+                  'decision':'REJECT' if observed != expected else 'ACCEPT',
+                  'stage':'A2','reason':'SHA-256 mismatch' if observed != expected else 'hash matched'})
+    cases.extend([
+        audit('06_invalid_syntax', '  this_is_not_valid_lean'),
+        audit('07_add_zero', '  intro n\\n  exact Nat.add_zero n',
+              goal='∀ n : Nat, n + 0 = n'),
+        audit('08_zero_add', '  intro n\\n  exact Nat.zero_add n',
+              goal='∀ n : Nat, 0 + n = n'),
+        audit('09_add_comm', '  intro a b\\n  exact Nat.add_comm a b',
+              goal='∀ a b : Nat, a + b = b + a'),
+        audit('10_induction', '  intro n\\n  induction n with\\n  | zero => rfl\\n  | succ k ih => rfl',
+              goal='∀ n : Nat, n + 0 = n'),
+        audit('11_false_goal', '  trivial', goal='False'),
+        audit('12_axiom_transitive', '  exact helper', goal='True',
+              trusted_prelude='axiom injected : True\\ntheorem helper : True := injected'),
+    ])
+    expected_decisions = {
+      '01_valid':'ACCEPT','02_sorry':'REJECT','03_custom_axiom':'REJECT',
+      '04_statement_substitution':'REJECT','05_artifact_modified':'REJECT',
+      '06_invalid_syntax':'REJECT','07_add_zero':'ACCEPT','08_zero_add':'ACCEPT',
+      '09_add_comm':'ACCEPT','10_induction':'ACCEPT','11_false_goal':'REJECT',
+      '12_axiom_transitive':'REJECT'}
     for case in cases:
         case['expected'] = expected_decisions[case['case']]
-        case['matches_expected'] = (case['decision'] == case['expected']) if case['decision'] != 'NOT_RUN' else None
-    result = {'timestamp_utc': datetime.now(timezone.utc).isoformat(), 'lean_version': lean_version(),
-              'lean_available': bool(LEAN), 'cases': cases}
-    (RESULTS / 'results.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-    with (RESULTS / 'results.csv').open('w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.DictWriter(f, fieldnames=['case', 'decision', 'stage', 'reason', 'expected', 'matches_expected'], extrasaction='ignore')
-        writer.writeheader()
-        writer.writerows(cases)
+        case['matches_expected'] = case['decision'] == case['expected'] if case['decision'] != 'NOT_RUN' else None
+    result = {'timestamp_utc':datetime.now(timezone.utc).isoformat(),
+              'lean_version':lean_version(),'lean_available':bool(LEAN),'cases':cases}
+    (RESULTS/'results.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    with (RESULTS/'results.csv').open('w',newline='',encoding='utf-8-sig') as f:
+        writer=csv.DictWriter(f,fieldnames=['case','decision','stage','reason','expected','matches_expected'],extrasaction='ignore')
+        writer.writeheader();writer.writerows(cases)
     for case in cases:
         print(f"{case['case']}: {case['decision']} (expected {case['expected']}) [{case['stage']}]")
-    if not LEAN:
-        print('Lean not installed: kernel-dependent tests were NOT_RUN')
-        raise SystemExit(2)
-    if not all(c['matches_expected'] for c in cases):
-        raise SystemExit(1)
-
+    if not LEAN:raise SystemExit(2)
+    if not all(c['matches_expected'] for c in cases):raise SystemExit(1)
 
 if __name__ == '__main__':
     main()
